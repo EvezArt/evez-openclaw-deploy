@@ -25,3 +25,33 @@ if command -v "$OPENCLAW_BIN" >/dev/null 2>&1 && [[ -n "${OPENCLAW_GATEWAY_TOKEN
 else
   echo 'Gateway health skipped: missing binary or token'
 fi
+
+AUTH_STORE="$OPENCLAW_STATE_DIR/agents/main/agent/auth-profiles.json"
+echo 'Provider auth profiles:'
+if [[ -f "$AUTH_STORE" ]]; then
+  python3 - "$AUTH_STORE" <<'PYAUTHCHK'
+import json,sys
+p=sys.argv[1]
+try:
+    j=json.load(open(p))
+except Exception as e:
+    print(f"  invalid auth store: {e}")
+    sys.exit(0)
+profiles=j.get('profiles') or {}
+by_provider={}
+for pid, cred in profiles.items():
+    provider=(cred or {}).get('provider')
+    if provider and (cred or {}).get('type') in {'api_key','token','oauth'}:
+        by_provider.setdefault(provider,0); by_provider[provider]+=1
+if by_provider:
+    for provider,count in sorted(by_provider.items()):
+        print(f"  {provider}: {count} profile(s)")
+else:
+    print('  missing provider keys: set GROQ_API_KEY or OPENROUTER_API_KEY (or another provider key) and rerun recover')
+PYAUTHCHK
+else
+  echo '  missing auth-profiles.json: set GROQ_API_KEY or OPENROUTER_API_KEY and rerun recover'
+fi
+if command -v "$OPENCLAW_BIN" >/dev/null 2>&1; then
+  env OPENCLAW_STATE_DIR="$OPENCLAW_STATE_DIR" OPENCLAW_CONFIG_PATH="$OPENCLAW_CONFIG_PATH" "$OPENCLAW_BIN" models status --plain --agent main || true
+fi

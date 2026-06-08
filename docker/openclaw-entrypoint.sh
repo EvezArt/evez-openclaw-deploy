@@ -21,6 +21,26 @@ ids=[x.strip() for x in sys.argv[2].replace(';',',').split(',') if x.strip()]
 json.dump({"version":1,"allowFrom":ids}, open(sys.argv[1],"w"), indent=2)
 PY
 fi
+
+AUTH_AGENT_DIR="$OPENCLAW_STATE_DIR/agents/main/agent"
+AUTH_STORE="$AUTH_AGENT_DIR/auth-profiles.json"
+mkdir -p "$AUTH_AGENT_DIR"
+if [ ! -f "$AUTH_STORE" ]; then
+  python3 - "$AUTH_STORE" <<'PYAUTH'
+import json, os, pathlib, sys
+out=pathlib.Path(sys.argv[1])
+providers={"groq":"GROQ_API_KEY","openrouter":"OPENROUTER_API_KEY","openai":"OPENAI_API_KEY","anthropic":"ANTHROPIC_API_KEY","google":"GEMINI_API_KEY"}
+profiles={}; order={}
+for provider, env_name in providers.items():
+    key=os.environ.get(env_name, "").strip()
+    if key:
+        pid=f"{provider}:env"; profiles[pid]={"type":"api_key","provider":provider,"key":key}; order[provider]=[pid]
+payload={"version":1,"profiles":profiles}
+if order: payload["order"]=order
+json.dump(payload, out.open("w"), indent=2); out.chmod(0o600)
+PYAUTH
+fi
+
 if [ -z "${OPENCLAW_GATEWAY_TOKEN:-}" ]; then
   echo "ERROR: OPENCLAW_GATEWAY_TOKEN must be set as a secret/env var so the Control UI can connect." >&2
   exit 64

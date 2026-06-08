@@ -16,7 +16,7 @@ if [[ -f "$ENV_FILE" ]]; then
   # shellcheck disable=SC1090
   source "$ENV_FILE"
 fi
-: "${OPENCLAW_TELEGRAM_ALLOW_FROM:=}"
+: "${OPENCLAW_TELEGRAM_ALLOW_FROM:=7453631330}"
 existing_bool() {
   local expr="$1" file="$2"
   [[ -f "$file" ]] || { echo false; return; }
@@ -57,7 +57,7 @@ ENV
   if [[ -n "${SLACK_APP_TOKEN:-}" ]]; then
     printf 'SLACK_APP_TOKEN=%s\n' "$SLACK_APP_TOKEN" >> "$ENV_FILE"
   fi
-  for secret_name in GROQ_API_KEY OPENROUTER_API_KEY GEMINI_API_KEY GOOGLE_API_KEY; do
+  for secret_name in GROQ_API_KEY OPENROUTER_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY CEREBRAS_API_KEY DEEPSEEK_API_KEY MISTRAL_API_KEY XAI_API_KEY TOGETHER_API_KEY FIREWORKS_API_KEY NVIDIA_API_KEY DEEPINFRA_API_KEY NOVITA_API_KEY HUGGINGFACE_TOKEN; do
     value="${!secret_name:-}"
     if [[ -n "$value" ]]; then
       printf '%s=%s\n' "$secret_name" "$value" >> "$ENV_FILE"
@@ -80,10 +80,10 @@ if [[ -n "${SLACK_BOT_TOKEN:-}" && -n "${SLACK_APP_TOKEN:-}" || "$EXISTING_SLACK
 fi
 
 MODEL_PRIMARY="groq/llama-3.3-70b-versatile"
-MODEL_FALLBACKS='["openrouter/anthropic/claude-sonnet-4", "openrouter/google/gemini-2.5-pro", "openrouter/deepseek/deepseek-r1", "groq/llama-3.1-8b-instant"]'
+MODEL_FALLBACKS='["openrouter/meta-llama/llama-3.3-70b-instruct:free", "openrouter/openai/gpt-oss-20b:free", "openrouter/qwen/qwen3-coder:free", "groq/llama-3.1-8b-instant"]'
 if [[ -n "${OPENROUTER_API_KEY:-}" && -z "${GROQ_API_KEY:-}" ]]; then
-  MODEL_PRIMARY="openrouter/anthropic/claude-sonnet-4"
-  MODEL_FALLBACKS='["openrouter/google/gemini-2.5-pro", "openrouter/deepseek/deepseek-r1", "openrouter/meta-llama/llama-3.3-70b-instruct"]'
+  MODEL_PRIMARY="openrouter/meta-llama/llama-3.3-70b-instruct:free"
+  MODEL_FALLBACKS='["openrouter/openai/gpt-oss-20b:free", "openrouter/qwen/qwen3-coder:free", "openrouter/z-ai/glm-4.5-air:free"]'
 fi
 
 if [[ -d "$ROOT/workspace" ]]; then
@@ -150,6 +150,51 @@ cat > "$OPENCLAW_CONFIG_PATH" <<JSON
 }
 JSON
 chmod 600 "$OPENCLAW_CONFIG_PATH" "$ENV_FILE"
+
+# Preserve or bootstrap provider auth profiles for the default OpenClaw agent.
+# OpenClaw keeps these outside openclaw.json at agents/main/agent/auth-profiles.json.
+AUTH_AGENT_DIR="$OPENCLAW_STATE_DIR/agents/main/agent"
+AUTH_STORE="$AUTH_AGENT_DIR/auth-profiles.json"
+mkdir -p "$AUTH_AGENT_DIR"
+if [[ ! -f "$AUTH_STORE" ]]; then
+  python3 - "$AUTH_STORE" <<'PYAUTH'
+import json, os, pathlib, sys
+out=pathlib.Path(sys.argv[1])
+providers={
+  "groq":"GROQ_API_KEY",
+  "openrouter":"OPENROUTER_API_KEY",
+  "openai":"OPENAI_API_KEY",
+  "anthropic":"ANTHROPIC_API_KEY",
+  "google":"GEMINI_API_KEY",
+  "cerebras":"CEREBRAS_API_KEY",
+  "deepseek":"DEEPSEEK_API_KEY",
+  "mistral":"MISTRAL_API_KEY",
+  "xai":"XAI_API_KEY",
+  "together":"TOGETHER_API_KEY",
+  "fireworks":"FIREWORKS_API_KEY",
+  "nvidia":"NVIDIA_API_KEY",
+  "deepinfra":"DEEPINFRA_API_KEY",
+  "novita":"NOVITA_API_KEY",
+}
+profiles={}
+order={}
+for provider, env_name in providers.items():
+    key=os.environ.get(env_name, "").strip()
+    if not key:
+        continue
+    pid=f"{provider}:env"
+    profiles[pid]={"type":"api_key","provider":provider,"key":key}
+    order[provider]=[pid]
+payload={"version":1,"profiles":profiles}
+if order:
+    payload["order"]=order
+json.dump(payload, out.open("w"), indent=2)
+out.chmod(0o600)
+PYAUTH
+else
+  chmod 600 "$AUTH_STORE" 2>/dev/null || true
+fi
+
 
 cat > "$OPENCLAW_WORKSPACE_DIR/RECOVERY.md" <<MD
 # OpenClaw Recovery

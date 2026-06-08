@@ -14,12 +14,11 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "groq/llama-3.3-70b-versatile",
+        "primary": "openrouter/meta-llama/llama-3.3-70b-instruct:free",
         "fallbacks": [
-          "openrouter/anthropic/claude-sonnet-4",
-          "openrouter/google/gemini-2.5-pro",
-          "openrouter/deepseek/deepseek-r1",
-          "groq/llama-3.1-8b-instant"
+          "openrouter/openai/gpt-oss-20b:free",
+          "openrouter/qwen/qwen3-coder:free",
+          "openrouter/z-ai/glm-4.5-air:free"
         ]
       },
       "thinkingDefault": "high",
