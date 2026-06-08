@@ -1,15 +1,103 @@
 {
   "gateway": {
     "mode": "local",
-    "port": 18789
+    "port": 18789,
+    "auth": {
+      "mode": "token",
+      "token": "evez2026"
+    }
   },
   "agents": {
     "defaults": {
-      "model": "groq/llama-3.3-70b-versatile"
+      "model": {
+        "primary": "groq/llama-3.3-70b-versatile",
+        "fallbacks": [
+          "openrouter/anthropic/claude-sonnet-4",
+          "openrouter/google/gemini-2.5-pro",
+          "openrouter/deepseek/deepseek-r1",
+          "groq/llama-3.1-8b-instant"
+        ]
+      },
+      "imageModel": "openrouter/anthropic/claude-sonnet-4",
+      "voiceModel": "groq/llama-3.3-70b-versatile",
+      "thinkingDefault": "high",
+      "workspace": "~/.openclaw/workspace"
+    }
+  },
+  "plugins": {
+    "entries": {
+      "telegram": { "enabled": true },
+      "webhooks": { "enabled": true },
+      "duckduckgo": { "enabled": true },
+      "exa": { "enabled": true },
+      "firecrawl": { "enabled": true },
+      "perplexity": { "enabled": true },
+      "tavily": { "enabled": true },
+      "searxng": { "enabled": true },
+      "active-memory": { "enabled": true },
+      "memory-wiki": { "enabled": true },
+      "workboard": { "enabled": true },
+      "codex-supervisor": { "enabled": true },
+      "admin-http-rpc": { "enabled": true },
+      "thread-ownership": { "enabled": true },
+      "open-prose": { "enabled": true },
+      "llm-task": { "enabled": true },
+      "sms": { "enabled": true },
+      "signal": { "enabled": true },
+      "policy": { "enabled": true },
+      "oc-path": { "enabled": true },
+      "browser": { "enabled": true },
+      "canvas": { "enabled": true },
+      "memory-core": { "enabled": true },
+      "talk-voice": { "enabled": true },
+      "device-pair": { "enabled": true },
+      "file-transfer": { "enabled": true },
+      "phone-control": { "enabled": true },
+      "groq": { "enabled": true },
+      "openrouter": { "enabled": true },
+      "github-copilot": { "enabled": true },
+      "deepseek": { "enabled": true },
+      "cerebras": { "enabled": true },
+      "fireworks": { "enabled": true },
+      "together": { "enabled": true },
+      "mistral": { "enabled": true },
+      "google": { "enabled": true },
+      "anthropic": { "enabled": true },
+      "openai": { "enabled": true },
+      "xai": { "enabled": true },
+      "nvidia": { "enabled": true },
+      "deepinfra": { "enabled": true },
+      "novita": { "enabled": true },
+      "huggingface": { "enabled": true },
+      "deepgram": { "enabled": true },
+      "elevenlabs": { "enabled": true },
+      "azure-speech": { "enabled": true },
+      "document-extract": { "enabled": true },
+      "image-generation-core": { "enabled": true },
+      "video-generation-core": { "enabled": true },
+      "media-understanding-core": { "enabled": true },
+      "web-readability": { "enabled": true },
+      "fal": { "enabled": true },
+      "comfy": { "enabled": true },
+      "runway": { "enabled": true },
+      "copilot-proxy": { "enabled": true },
+      "kilocode": { "enabled": true },
+      "kimi-coding": { "enabled": true },
+      "opencode": { "enabled": true },
+      "senseaudio": { "enabled": true },
+      "venice": { "enabled": true }
+    }
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true
+    },
+    "slack": {
+      "enabled": true
     }
   },
   "meta": {
     "lastTouchedVersion": "2026.6.1",
-    "lastTouchedAt": "2026-06-08T19:24:15.676Z"
+    "lastTouchedAt": "2026-06-08T19:35:00.000Z"
   }
 }

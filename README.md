@@ -1,60 +1,53 @@
 # EVEZ OpenClaw Deploy
 
-Pre-configured OpenClaw personal AI agent with Groq + OpenRouter providers, 7 plugins, and EVEZ workspace identity.
+Pre-configured OpenClaw personal AI agent — maxed out with 60 plugins, 27+ models, Telegram/Slack channels, and model fallback chains.
 
 ## Quick Start
 
-### Option 1: Local Install (fastest)
+### Option 1: Docker (recommended for Galaxy A16 + PC setup)
 ```bash
-# Install OpenClaw
-curl -fsSL https://openclaw.ai/install.sh | bash
-
-# Copy config
-cp openclaw.json ~/.openclaw/openclaw.json
-cp .env.example ~/.openclaw/.env
-# Edit .env with your API keys
-
-# Start
-openclaw gateway
-```
-
-### Option 2: Docker (persistent)
-```bash
+git clone https://github.com/EvezArt/evez-openclaw-deploy.git
+cd evez-openclaw-deploy
 cp .env.example .env
-# Edit .env with your API keys
+# Add your API keys to .env
 docker compose up -d
 # Dashboard: http://localhost:18789
+```
+
+### Option 2: Local Install
+```bash
+curl -fsSL https://openclaw.ai/install.sh | bash
+cp openclaw.json ~/.openclaw/openclaw.json
+cp .env.example ~/.openclaw/.env
+# Edit ~/.openclaw/.env with your keys
+openclaw gateway
 ```
 
 ### Option 3: Fly.io (cloud, always-on)
 ```bash
 fly launch --config fly.toml
-fly secrets set GROQ_API_KEY=your_key OPENROUTER_API_KEY=your_key
+fly secrets set GROQ_API_KEY=... OPENROUTER_API_KEY=...
 fly deploy
-# Dashboard: https://evez-openclaw.fly.dev
 ```
+
+## Mobile App
+See [evez-openclaw-apk](https://github.com/EvezArt/evez-openclaw-apk) for the Android app (Galaxy A16).
 
 ## What's Configured
 
-### Models (27 available)
-- **Default:** `groq/llama-3.3-70b-versatile` (ultra-fast via Groq)
-- **Groq:** llama-3.3-70b, llama-3.1-8b, compound, qwen3-32b
-- **OpenRouter:** 200+ models (Claude, GPT, Gemini, Deepseek, etc.)
+| Category | Count | Details |
+|----------|-------|---------|
+| Plugins  | 60    | All available plugins enabled |
+| Models   | 27+   | Groq, OpenRouter, GitHub Copilot, DeepSeek, etc. |
+| Channels | 2     | Telegram, Slack |
+| Fallbacks| 4     | Auto-failover: Groq → Claude → Gemini → DeepSeek → Llama-8b |
+| Thinking | High  | Extended reasoning enabled |
 
-### Plugins (7 loaded)
-- `browser` — web browsing and scraping
-- `canvas` — visual generation
-- `memory-core` — persistent agent memory
-- `talk-voice` — voice input/output
-- `device-pair` — multi-device sync
-- `file-transfer` — file sharing
-- `phone-control` — mobile integration
-
-### Workspace
-- `SOUL.md` — EVEZ agent identity and mission
-- `AGENTS.md` — model catalog and tool reference
-
-## Dashboard
-Once running, open `http://localhost:18789` for the OpenClaw Control web UI.
+## Telegram Setup
+1. Message [@BotFather](https://t.me/BotFather) on Telegram
+2. `/newbot` → name it "EVEZ OpenClaw"
+3. Copy the bot token
+4. Add to `.env`: `TELEGRAM_BOT_TOKEN=your_token`
+5. Restart: `docker compose restart`
 
 ## Built by Viktor AI for EVEZ
