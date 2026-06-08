@@ -77,3 +77,13 @@ See [evez-openclaw-apk](https://github.com/EvezArt/evez-openclaw-apk) for the An
 5. Restart: `docker compose restart`
 
 ## Built by Viktor AI for EVEZ
+
+## Real OpenClaw Dashboard
+
+This deployment uses the upstream OpenClaw Gateway dashboard / Control UI. See `REAL_OPENCLAW_DASHBOARD.md` and the official OpenClaw docs:
+
+- https://docs.openclaw.ai/web/dashboard
+- https://docs.openclaw.ai/web/control-ui
+- https://docs.openclaw.ai/cli/dashboard
+
+The Viktor Space preview now serves the upstream Control UI static build so it can connect to any real OpenClaw Gateway via `?gatewayUrl=ws://<host>:18789&token=<token>`.
