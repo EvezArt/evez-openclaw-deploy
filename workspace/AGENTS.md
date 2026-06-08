@@ -1,65 +1,48 @@
-# EVEZ Agent Configuration — Full Catalog
+# EVEZ OpenClaw Agent Configuration
 
 ## Default Model
-`groq/llama-3.3-70b-versatile` with fallbacks:
-1. `openrouter/anthropic/claude-sonnet-4`
-2. `openrouter/google/gemini-2.5-pro`
-3. `openrouter/deepseek/deepseek-r1`
+
+`groq/llama-3.3-70b-versatile` when `GROQ_API_KEY` is configured.
+
+Fallbacks configured by onboarding:
+1. `openrouter/meta-llama/llama-3.3-70b-instruct:free`
+2. `openrouter/openai/gpt-oss-20b:free`
+3. `openrouter/qwen/qwen3-coder:free`
 4. `groq/llama-3.1-8b-instant`
 
-## Available Models by Provider
+If only OpenRouter is configured, onboarding promotes OpenRouter to primary.
 
-### Groq (Ultra-fast, free tier)
-- llama-3.3-70b-versatile ⭐ (default)
-- llama-3.1-8b-instant
-- compound / compound-mini
-- qwen/qwen3-32b
-- meta-llama/llama-4-scout-17b-16e-instruct
-- openai/gpt-oss-120b / gpt-oss-20b
+## Loaded baseline plugins
 
-### OpenRouter (200+ models via single key)
-- anthropic/claude-sonnet-4, claude-opus-4
-- openai/gpt-4o, gpt-4-turbo
-- google/gemini-2.5-pro, gemini-2.5-flash
-- deepseek/deepseek-r1, deepseek-v3
-- meta-llama/llama-3.3-70b-instruct
-- moonshotai/kimi-k2.5, kimi-k2.6
+Generated config enables:
 
-### GitHub Copilot
-- claude-opus-4.6/4.7/4.8
-- claude-sonnet-4.6
-- gemini-2.5-pro, gemini-3-flash, gemini-3.1-pro
-- gpt-5.3-codex, gpt-5.4, gpt-5.5
-- goldeneye, raptor-mini
+- `memory-core`
+- `llm-task`
+- `telegram` when `TELEGRAM_BOT_TOKEN` exists or existing config had Telegram enabled
+- `slack` when `SLACK_BOT_TOKEN` + `SLACK_APP_TOKEN` exist or existing config had Slack enabled
+- `open-prose`
+- `copilot-proxy`
+- `lobster` — bundled host-compatible Lobster plugin
 
-## Plugins Loaded (17 active)
-- active-memory: persistent agent memory across sessions
-- admin-http-rpc: remote administration API
-- browser: web browsing and scraping
-- canvas: visual generation
-- device-pair: multi-device sync (phone ↔ PC)
-- file-transfer: file sharing
-- llm-task: background LLM task execution
-- memory-core: core memory system
-- memory-wiki: wiki-style knowledge base
-- openrouter: 200+ model provider
-- phone-control: mobile integration
-- policy: agent behavior policies
-- talk-voice: voice I/O
-- telegram: Telegram messenger channel
-- thread-ownership: multi-user session management
-- webhooks: HTTP webhook integrations
-- workboard: task/project management
+## Workspace skills
+
+- `clawdhub` — verified ClawHub skill for ClawdHub CLI usage.
+- `lobster` — verified ClawHub skill for deterministic typed workflows and approval gates.
+
+## EVEZ context
+
+- Identity seed: `EVEZ_IDENTITY.md`
+- Public repo inventory: `ecosystem/github-public-repos.json`
+- Optional private local-only repo inventory: `private/github-visible-repos-private.json`
 
 ## Channels
-- Telegram (configure TELEGRAM_BOT_TOKEN)
-- Slack (configure SLACK_BOT_TOKEN + SLACK_APP_TOKEN)
-- SMS, Signal available with additional setup
 
-## Tools
-- Web search (DuckDuckGo, Exa, Perplexity, Tavily, SearXNG)
-- Browser automation
-- Document extraction
-- Image/video generation (Fal, ComfyUI, Runway)
-- Voice (Deepgram, ElevenLabs, Azure Speech)
-- Code execution (Codex supervisor)
+- Telegram: enabled when token is present and allowlist configured.
+- Slack: config slots are preserved; enable by providing Slack bot/app tokens.
+
+## Operating rules
+
+- Use real upstream OpenClaw Gateway + Control UI; do not substitute a custom dashboard.
+- Keep secrets in `openclaw.env` or provider dashboards, never in git.
+- Use Lobster approval gates before side-effecting multi-step automations.
+- Prefer action and concrete recovery checks over long explanation.

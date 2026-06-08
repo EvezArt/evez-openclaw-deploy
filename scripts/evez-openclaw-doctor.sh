@@ -52,6 +52,13 @@ PYAUTHCHK
 else
   echo '  missing auth-profiles.json: set GROQ_API_KEY or OPENROUTER_API_KEY and rerun recover'
 fi
+if [[ -f "$OPENCLAW_STATE_DIR/workspace/EVEZ_IDENTITY.md" ]]; then echo 'EVEZ identity seed exists'; else echo 'EVEZ identity seed missing'; fi
+if [[ -f "$OPENCLAW_STATE_DIR/workspace/ecosystem/github-public-repos.json" ]]; then echo 'EVEZ public repo inventory exists'; else echo 'EVEZ public repo inventory missing'; fi
+if [[ -f "$OPENCLAW_STATE_DIR/workspace/private/github-visible-repos-private.json" ]]; then echo 'EVEZ private local repo inventory exists'; fi
 if command -v "$OPENCLAW_BIN" >/dev/null 2>&1; then
+  echo 'Plugins:'
+  env OPENCLAW_STATE_DIR="$OPENCLAW_STATE_DIR" OPENCLAW_CONFIG_PATH="$OPENCLAW_CONFIG_PATH" "$OPENCLAW_BIN" plugins list || true
+  echo 'Skills:'
+  env OPENCLAW_STATE_DIR="$OPENCLAW_STATE_DIR" OPENCLAW_CONFIG_PATH="$OPENCLAW_CONFIG_PATH" "$OPENCLAW_BIN" skills check || true
   env OPENCLAW_STATE_DIR="$OPENCLAW_STATE_DIR" OPENCLAW_CONFIG_PATH="$OPENCLAW_CONFIG_PATH" "$OPENCLAW_BIN" models status --plain --agent main || true
 fi

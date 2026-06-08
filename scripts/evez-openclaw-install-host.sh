@@ -17,6 +17,7 @@ if ! command -v "$OPENCLAW_BIN" >/dev/null 2>&1; then
   exit 127
 fi
 "$ROOT/scripts/evez-openclaw-onboard.sh"
+"$ROOT/scripts/evez-openclaw-ecosystem-sync.sh" --public-only || true
 "$ROOT/scripts/evez-openclaw-recover.sh"
 "$ROOT/scripts/evez-openclaw-doctor.sh" || true
 cat <<OUT

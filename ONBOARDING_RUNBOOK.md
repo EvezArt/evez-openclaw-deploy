@@ -19,8 +19,11 @@ cp .env.example .env
 
 This creates:
 - `~/.openclaw/openclaw.json`
-- `~/.openclaw/openclaw.env` containing the local gateway token
+- `~/.openclaw/openclaw.env` containing the local gateway token and durable provider/channel env values
 - `~/.openclaw/workspace`
+- `~/.openclaw/workspace/EVEZ_IDENTITY.md`
+- `~/.openclaw/workspace/ecosystem/github-public-repos.json`
+- verified Clawhub and Lobster workspace skills
 - `~/.openclaw/agentvault-connector.json`
 - running Gateway on `ws://127.0.0.1:18789`
 - dashboard at `http://127.0.0.1:18789/`
@@ -61,26 +64,42 @@ Docker:
 docker compose up -d
 ```
 
-## 5. Verify
+## 5. EVEZ ecosystem sync
+
+Refresh public EvezArt repo context:
+
+```bash
+./scripts/evez-openclaw-ecosystem-sync.sh --public-only
+```
+
+If `GITHUB_TOKEN` or `GH_TOKEN` is available locally, build a private local-only visible repo inventory:
+
+```bash
+./scripts/evez-openclaw-ecosystem-sync.sh --include-private
+```
+
+The private inventory is written under `~/.openclaw/workspace/private/` and is git-ignored.
+
+## 6. Verify
 
 ```bash
 ./scripts/evez-openclaw-doctor.sh
 openclaw gateway health --url ws://127.0.0.1:18789 --token "$(sed -n 's/^OPENCLAW_GATEWAY_TOKEN=//p' ~/.openclaw/openclaw.env)"
 ```
 
-## 6. Rotate gateway token
+## 7. Rotate gateway token
 
 ```bash
 ./scripts/evez-openclaw-vault-rotate.sh
 ```
 
-## 7. Back up memory/workspace without secrets
+## 8. Back up memory/workspace without secrets
 
 ```bash
 ./scripts/evez-openclaw-backup-state.sh
 ```
 
-## 8. If anything breaks
+## 9. If anything breaks
 
 ```bash
 ./scripts/evez-openclaw-recover.sh

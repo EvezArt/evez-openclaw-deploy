@@ -12,12 +12,27 @@ ENV_FILE="$OPENCLAW_STATE_DIR/openclaw.env"
 mkdir -p "$OPENCLAW_STATE_DIR" "$OPENCLAW_WORKSPACE_DIR" "$OPENCLAW_STATE_DIR/logs" "$OPENCLAW_STATE_DIR/run"
 chmod 700 "$OPENCLAW_STATE_DIR"
 
+# Values supplied by the caller should override stale values in openclaw.env;
+# snapshot them before sourcing the persisted env file.
+PERSIST_ENV_NAMES=(OPENCLAW_GATEWAY_TOKEN OPENCLAW_PORT OPENCLAW_BIND OPENCLAW_STATE_DIR OPENCLAW_CONFIG_PATH OPENCLAW_WORKSPACE_DIR OPENCLAW_TELEGRAM_ALLOW_FROM TELEGRAM_BOT_TOKEN SLACK_BOT_TOKEN SLACK_APP_TOKEN GROQ_API_KEY OPENROUTER_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY CEREBRAS_API_KEY DEEPSEEK_API_KEY MISTRAL_API_KEY XAI_API_KEY TOGETHER_API_KEY FIREWORKS_API_KEY NVIDIA_API_KEY DEEPINFRA_API_KEY NOVITA_API_KEY HUGGINGFACE_TOKEN GITHUB_TOKEN GH_TOKEN)
+for name in "${PERSIST_ENV_NAMES[@]}"; do
+  value="${!name:-}"
+  printf -v "__EVEZ_INPUT_${name}" '%s' "$value"
+done
 if [[ -f "$ENV_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090
   source "$ENV_FILE"
   set +a
 fi
+for name in "${PERSIST_ENV_NAMES[@]}"; do
+  input_var="__EVEZ_INPUT_${name}"
+  input="${!input_var:-}"
+  if [[ -n "$input" ]]; then
+    printf -v "$name" '%s' "$input"
+    export "$name"
+  fi
+done
 : "${OPENCLAW_TELEGRAM_ALLOW_FROM:=}"
 existing_bool() {
   local expr="$1" file="$2"
@@ -59,7 +74,7 @@ ENV
   if [[ -n "${SLACK_APP_TOKEN:-}" ]]; then
     printf 'SLACK_APP_TOKEN=%s\n' "$SLACK_APP_TOKEN" >> "$ENV_FILE"
   fi
-  for secret_name in GROQ_API_KEY OPENROUTER_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY CEREBRAS_API_KEY DEEPSEEK_API_KEY MISTRAL_API_KEY XAI_API_KEY TOGETHER_API_KEY FIREWORKS_API_KEY NVIDIA_API_KEY DEEPINFRA_API_KEY NOVITA_API_KEY HUGGINGFACE_TOKEN; do
+  for secret_name in GROQ_API_KEY OPENROUTER_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY CEREBRAS_API_KEY DEEPSEEK_API_KEY MISTRAL_API_KEY XAI_API_KEY TOGETHER_API_KEY FIREWORKS_API_KEY NVIDIA_API_KEY DEEPINFRA_API_KEY NOVITA_API_KEY HUGGINGFACE_TOKEN GITHUB_TOKEN GH_TOKEN; do
     value="${!secret_name:-}"
     if [[ -n "$value" ]]; then
       printf '%s=%s\n' "$secret_name" "$value" >> "$ENV_FILE"
@@ -67,6 +82,49 @@ ENV
   done
 fi
 
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+# Re-apply caller overrides before persisting, so rotated keys win over stale env.
+for name in "${PERSIST_ENV_NAMES[@]}"; do
+  input_var="__EVEZ_INPUT_${name}"
+  input="${!input_var:-}"
+  if [[ -n "$input" ]]; then
+    printf -v "$name" '%s' "$input"
+    export "$name"
+  fi
+done
+
+# Persist newly supplied env values without echoing secrets. This makes recovery
+# durable when a provider/channel token is injected after the first onboard run.
+upsert_env_var() {
+  local name="$1" value="${!1:-}"
+  [[ -n "$value" ]] || return 0
+  touch "$ENV_FILE"
+  chmod 600 "$ENV_FILE" 2>/dev/null || true
+  python3 - "$ENV_FILE" "$name" "$value" <<'PYENV'
+import pathlib, sys
+path=pathlib.Path(sys.argv[1]); name=sys.argv[2]; value=sys.argv[3]
+lines=path.read_text().splitlines() if path.exists() else []
+out=[]; replaced=False
+for line in lines:
+    if line.startswith(name+'='):
+        if not replaced:
+            out.append(f'{name}={value}')
+            replaced=True
+        continue
+    out.append(line)
+if not replaced:
+    out.append(f'{name}={value}')
+path.write_text('\n'.join(out).rstrip()+'\n')
+PYENV
+}
+for persist_name in "${PERSIST_ENV_NAMES[@]}"; do
+  upsert_env_var "$persist_name"
+done
 if [[ -f "$ENV_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090
@@ -139,6 +197,7 @@ cat > "$OPENCLAW_CONFIG_PATH" <<JSON
       "llm-task": { "enabled": true },
       "slack": { "enabled": $SLACK_ENABLED },
       "telegram": { "enabled": $TELEGRAM_ENABLED },
+      "lobster": { "enabled": true },
       "whatsapp": { "enabled": false },
       "signal": { "enabled": false },
       "discord": { "enabled": false },

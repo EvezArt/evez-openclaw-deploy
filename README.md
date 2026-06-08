@@ -2,7 +2,7 @@
 
 Real upstream OpenClaw Gateway + Control UI deployment kit for EVEZ.
 
-This repo is configured to keep OpenClaw recoverable instead of losing gateway/channel state: host onboarding, gateway recovery, doctor checks, Docker/Fly surfaces, Telegram allowlisting, AgentVault connector profile staging, token rotation, and backup scripts.
+This repo is configured to keep OpenClaw recoverable instead of losing gateway/channel state: host onboarding, gateway recovery, doctor checks, Docker/Fly surfaces, Telegram allowlisting, AgentVault connector profile staging, provider auth bootstrapping, ClawHub/Lobster workspace skills, EVEZ identity/repo ecosystem seeding, token rotation, and backup scripts.
 
 ## Current verified baseline
 
@@ -101,6 +101,22 @@ Static Control UI preview:
 
 ```text
 https://preview-evez-openclaw-70c67950.viktor.space/?gatewayUrl=ws://<gateway-host>:18789&token=<gateway-token>
+```
+
+## EVEZ ecosystem bootstrap
+
+OpenClaw now starts with EVEZ identity/repo context and ClawHub/Lobster workflow skills in its workspace. See [EVEZ_ECOSYSTEM_BOOTSTRAP.md](EVEZ_ECOSYSTEM_BOOTSTRAP.md).
+
+Refresh public repo context:
+
+```bash
+./scripts/evez-openclaw-ecosystem-sync.sh --public-only
+```
+
+If a local GitHub token is present and you want OpenClaw to know private repo metadata locally without committing it:
+
+```bash
+OPENCLAW_STATE_DIR=~/.openclaw ./scripts/evez-openclaw-ecosystem-sync.sh --include-private
 ```
 
 ## Telegram setup
