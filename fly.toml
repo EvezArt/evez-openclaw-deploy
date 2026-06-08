@@ -2,15 +2,20 @@ app = "evez-openclaw"
 primary_region = "iad"
 
 [build]
-image = "openclaw/openclaw:latest"
+dockerfile = "Dockerfile"
 
 [env]
 NODE_ENV = "production"
 OPENCLAW_STATE_DIR = "/data"
+OPENCLAW_CONFIG_PATH = "/data/openclaw.json"
+OPENCLAW_WORKSPACE_DIR = "/data/workspace"
+OPENCLAW_PORT = "3000"
+OPENCLAW_BIND = "lan"
+OPENCLAW_TELEGRAM_ALLOW_FROM = ""
 NODE_OPTIONS = "--max-old-space-size=1536"
 
 [processes]
-app = "node dist/index.js gateway --allow-unconfigured --port 3000 --bind lan"
+app = "node dist/index.js gateway --port 3000 --bind lan"
 
 [http_service]
 internal_port = 3000
@@ -18,6 +23,13 @@ force_https = true
 auto_stop_machines = false
 auto_start_machines = true
 min_machines_running = 1
+
+  [[http_service.checks]]
+  interval = "30s"
+  timeout = "10s"
+  grace_period = "20s"
+  method = "GET"
+  path = "/"
 
 [mounts]
 source = "openclaw_data"

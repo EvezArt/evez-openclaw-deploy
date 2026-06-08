@@ -2,200 +2,31 @@
   "gateway": {
     "mode": "local",
     "port": 18789,
+    "bind": "loopback",
     "auth": {
-      "mode": "token",
-      "token": "evez2026"
-    }
+      "mode": "token"
+    },
+    "controlUi": {
+      "basePath": "/"
+    },
+    "remote": {}
   },
   "agents": {
     "defaults": {
       "model": {
         "primary": "groq/llama-3.3-70b-versatile",
         "fallbacks": [
-          "groq/llama-3.1-8b-instant",
-          "google/gemini-2.5-flash",
-          "google/gemini-2.5-pro",
-          "groq/qwen-qwq-32b"
+          "openrouter/anthropic/claude-sonnet-4",
+          "openrouter/google/gemini-2.5-pro",
+          "openrouter/deepseek/deepseek-r1",
+          "groq/llama-3.1-8b-instant"
         ]
       },
-      "imageModel": "openrouter/anthropic/claude-sonnet-4",
-      "voiceModel": "groq/llama-3.3-70b-versatile",
       "thinkingDefault": "high",
-      "workspace": "~/.openclaw/workspace"
-    }
-  },
-  "plugins": {
-    "entries": {
-      "telegram": {
-        "enabled": true
-      },
-      "webhooks": {
-        "enabled": true
-      },
-      "duckduckgo": {
-        "enabled": true
-      },
-      "exa": {
-        "enabled": true
-      },
-      "firecrawl": {
-        "enabled": true
-      },
-      "perplexity": {
-        "enabled": true
-      },
-      "tavily": {
-        "enabled": true
-      },
-      "searxng": {
-        "enabled": true
-      },
-      "active-memory": {
-        "enabled": true
-      },
-      "memory-wiki": {
-        "enabled": true
-      },
-      "workboard": {
-        "enabled": true
-      },
-      "codex-supervisor": {
-        "enabled": true
-      },
-      "admin-http-rpc": {
-        "enabled": true
-      },
-      "thread-ownership": {
-        "enabled": true
-      },
-      "open-prose": {
-        "enabled": true
-      },
-      "llm-task": {
-        "enabled": true
-      },
-      "sms": {
-        "enabled": true
-      },
-      "signal": {
-        "enabled": true
-      },
-      "policy": {
-        "enabled": true
-      },
-      "oc-path": {
-        "enabled": true
-      },
-      "browser": {
-        "enabled": true
-      },
-      "canvas": {
-        "enabled": true
-      },
-      "memory-core": {
-        "enabled": true
-      },
-      "talk-voice": {
-        "enabled": true
-      },
-      "device-pair": {
-        "enabled": true
-      },
-      "file-transfer": {
-        "enabled": true
-      },
-      "phone-control": {
-        "enabled": true
-      },
-      "groq": {
-        "enabled": true
-      },
-      "openrouter": {
-        "enabled": true
-      },
-      "github-copilot": {
-        "enabled": true
-      },
-      "deepseek": {
-        "enabled": true
-      },
-      "cerebras": {
-        "enabled": true
-      },
-      "fireworks": {
-        "enabled": true
-      },
-      "together": {
-        "enabled": true
-      },
-      "mistral": {
-        "enabled": true
-      },
-      "google": {
-        "enabled": true
-      },
-      "anthropic": {
-        "enabled": true
-      },
-      "openai": {
-        "enabled": true
-      },
-      "xai": {
-        "enabled": true
-      },
-      "nvidia": {
-        "enabled": true
-      },
-      "deepinfra": {
-        "enabled": true
-      },
-      "novita": {
-        "enabled": true
-      },
-      "huggingface": {
-        "enabled": true
-      },
-      "deepgram": {
-        "enabled": true
-      },
-      "elevenlabs": {
-        "enabled": true
-      },
-      "azure-speech": {
-        "enabled": true
-      },
-      "document-extract": {
-        "enabled": true
-      },
-      "web-readability": {
-        "enabled": true
-      },
-      "fal": {
-        "enabled": true
-      },
-      "comfy": {
-        "enabled": true
-      },
-      "runway": {
-        "enabled": true
-      },
-      "copilot-proxy": {
-        "enabled": true
-      },
-      "kilocode": {
-        "enabled": true
-      },
-      "opencode": {
-        "enabled": true
-      },
-      "senseaudio": {
-        "enabled": true
-      },
-      "venice": {
-        "enabled": true
-      },
-      "slack": {
-        "enabled": true
+      "workspace": "~/.openclaw/workspace",
+      "timeoutSeconds": 1800,
+      "heartbeat": {
+        "every": "0m"
       }
     }
   },
@@ -204,27 +35,50 @@
       "enabled": true
     },
     "slack": {
-      "enabled": true
+      "enabled": false
     }
   },
-  "meta": {
-    "lastTouchedVersion": "2026.6.1",
-    "lastTouchedAt": "2026-06-08T19:52:45.536Z"
-  },
-  "tools": {
-    "byProvider": {
-      "groq/llama-3.3-70b-versatile": {
-        "deny": [
-          "group:web",
-          "browser"
-        ]
+  "plugins": {
+    "entries": {
+      "memory-core": {
+        "enabled": true
       },
-      "groq/llama-3.1-8b-instant": {
-        "deny": [
-          "group:web",
-          "browser"
-        ]
+      "llm-task": {
+        "enabled": true
+      },
+      "slack": {
+        "enabled": false
+      },
+      "telegram": {
+        "enabled": true
+      },
+      "whatsapp": {
+        "enabled": false
+      },
+      "signal": {
+        "enabled": false
+      },
+      "discord": {
+        "enabled": false
+      },
+      "open-prose": {
+        "enabled": true
+      },
+      "copilot-proxy": {
+        "enabled": true
       }
+    }
+  },
+  "session": {
+    "scope": "per-sender",
+    "resetTriggers": [
+      "/new",
+      "/reset"
+    ],
+    "reset": {
+      "mode": "daily",
+      "atHour": 4,
+      "idleMinutes": 10080
     }
   }
 }

@@ -16,6 +16,22 @@ if [[ -f "$ENV_FILE" ]]; then
   # shellcheck disable=SC1090
   source "$ENV_FILE"
 fi
+: "${OPENCLAW_TELEGRAM_ALLOW_FROM:=7453631330}"
+existing_bool() {
+  local expr="$1" file="$2"
+  [[ -f "$file" ]] || { echo false; return; }
+  python3 - "$file" "$expr" <<'PYBOOL' 2>/dev/null || echo false
+import json,sys
+p,expr=sys.argv[1],sys.argv[2]
+j=json.load(open(p))
+cur=j
+for part in expr.split('.'):
+    cur=cur.get(part,{}) if isinstance(cur,dict) else {}
+print('true' if cur is True else 'false')
+PYBOOL
+}
+EXISTING_TELEGRAM_ENABLED="$(existing_bool channels.telegram.enabled "$OPENCLAW_CONFIG_PATH")"
+EXISTING_SLACK_ENABLED="$(existing_bool channels.slack.enabled "$OPENCLAW_CONFIG_PATH")"
 if [[ -z "${OPENCLAW_GATEWAY_TOKEN:-}" ]]; then
   OPENCLAW_GATEWAY_TOKEN="$(openssl rand -hex 32 2>/dev/null || python3 - <<'PY'
 import secrets
@@ -30,6 +46,7 @@ OPENCLAW_BIND=$OPENCLAW_BIND
 OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR
 OPENCLAW_CONFIG_PATH=$OPENCLAW_CONFIG_PATH
 OPENCLAW_WORKSPACE_DIR=$OPENCLAW_WORKSPACE_DIR
+OPENCLAW_TELEGRAM_ALLOW_FROM=$OPENCLAW_TELEGRAM_ALLOW_FROM
 ENV
   if [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]]; then
     printf 'TELEGRAM_BOT_TOKEN=%s\n' "$TELEGRAM_BOT_TOKEN" >> "$ENV_FILE"
@@ -40,19 +57,51 @@ ENV
   if [[ -n "${SLACK_APP_TOKEN:-}" ]]; then
     printf 'SLACK_APP_TOKEN=%s\n' "$SLACK_APP_TOKEN" >> "$ENV_FILE"
   fi
+  for secret_name in GROQ_API_KEY OPENROUTER_API_KEY GEMINI_API_KEY GOOGLE_API_KEY; do
+    value="${!secret_name:-}"
+    if [[ -n "$value" ]]; then
+      printf '%s=%s\n' "$secret_name" "$value" >> "$ENV_FILE"
+    fi
+  done
+fi
+
+if [[ -f "$ENV_FILE" ]]; then
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
 fi
 
 TELEGRAM_ENABLED=false
-if [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]]; then
+if [[ -n "${TELEGRAM_BOT_TOKEN:-}" || "$EXISTING_TELEGRAM_ENABLED" == "true" ]]; then
   TELEGRAM_ENABLED=true
 fi
 SLACK_ENABLED=false
-if [[ -n "${SLACK_BOT_TOKEN:-}" && -n "${SLACK_APP_TOKEN:-}" ]]; then
+if [[ -n "${SLACK_BOT_TOKEN:-}" && -n "${SLACK_APP_TOKEN:-}" || "$EXISTING_SLACK_ENABLED" == "true" ]]; then
   SLACK_ENABLED=true
+fi
+
+MODEL_PRIMARY="groq/llama-3.3-70b-versatile"
+MODEL_FALLBACKS='["openrouter/anthropic/claude-sonnet-4", "openrouter/google/gemini-2.5-pro", "openrouter/deepseek/deepseek-r1", "groq/llama-3.1-8b-instant"]'
+if [[ -n "${OPENROUTER_API_KEY:-}" && -z "${GROQ_API_KEY:-}" ]]; then
+  MODEL_PRIMARY="openrouter/anthropic/claude-sonnet-4"
+  MODEL_FALLBACKS='["openrouter/google/gemini-2.5-pro", "openrouter/deepseek/deepseek-r1", "openrouter/meta-llama/llama-3.3-70b-instruct"]'
 fi
 
 if [[ -d "$ROOT/workspace" ]]; then
   cp -Rn "$ROOT/workspace/." "$OPENCLAW_WORKSPACE_DIR/" 2>/dev/null || true
+fi
+if [[ -f "$ROOT/runtime/agentvault-connector.json" ]]; then
+  cp "$ROOT/runtime/agentvault-connector.json" "$OPENCLAW_STATE_DIR/agentvault-connector.json"
+  chmod 600 "$OPENCLAW_STATE_DIR/agentvault-connector.json" 2>/dev/null || true
+fi
+mkdir -p "$OPENCLAW_STATE_DIR/credentials"
+if [[ -n "${OPENCLAW_TELEGRAM_ALLOW_FROM:-}" ]]; then
+  python3 - "$OPENCLAW_STATE_DIR/credentials/telegram-allowFrom.json" "$OPENCLAW_TELEGRAM_ALLOW_FROM" <<'PYALLOW'
+import json,sys
+out=sys.argv[1]
+ids=[x.strip() for x in sys.argv[2].replace(';',',').split(',') if x.strip()]
+json.dump({"version":1,"allowFrom":ids}, open(out,"w"), indent=2)
+PYALLOW
+  chmod 600 "$OPENCLAW_STATE_DIR/credentials/telegram-allowFrom.json" 2>/dev/null || true
 fi
 cat > "$OPENCLAW_CONFIG_PATH" <<JSON
 {
@@ -67,13 +116,8 @@ cat > "$OPENCLAW_CONFIG_PATH" <<JSON
   "agents": {
     "defaults": {
       "model": {
-        "primary": "groq/llama-3.3-70b-versatile",
-        "fallbacks": [
-          "openrouter/anthropic/claude-sonnet-4",
-          "openrouter/google/gemini-2.5-pro",
-          "openrouter/deepseek/deepseek-r1",
-          "groq/llama-3.1-8b-instant"
-        ]
+        "primary": "$MODEL_PRIMARY",
+        "fallbacks": $MODEL_FALLBACKS
       },
       "thinkingDefault": "high",
       "workspace": "$OPENCLAW_WORKSPACE_DIR",

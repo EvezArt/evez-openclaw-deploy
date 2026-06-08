@@ -1,89 +1,121 @@
 # EVEZ OpenClaw Deploy
 
-Pre-configured OpenClaw personal AI agent — maxed out with 60 plugins, 27+ models, Telegram/Slack channels, and model fallback chains.
+Real upstream OpenClaw Gateway + Control UI deployment kit for EVEZ.
 
+This repo is configured to keep OpenClaw recoverable instead of losing gateway/channel state: host onboarding, gateway recovery, doctor checks, Docker/Fly surfaces, Telegram allowlisting, AgentVault connector profile staging, token rotation, and backup scripts.
 
-## Surface Deployments
+## Current verified baseline
 
-OpenClaw is now packaged for every EVEZ surface Steven asked for:
+- Gateway mode: `local`
+- Default port: `18789`
+- Default bind: loopback for host installs, LAN for container/cloud surfaces
+- Dashboard: upstream OpenClaw Control UI served by the Gateway at `/`
+- Telegram allowlist: set `OPENCLAW_TELEGRAM_ALLOW_FROM` in local/private env when needed
+- AgentVault connector profile: `agentvault-connector` v1.3.5 staged outside `openclaw.json` because OpenClaw rejects unknown config keys
 
-- **Desktop / server:** Docker Compose gateway + OpenClaw Control dashboard
-- **Cloud:** Fly.io config with persistent volume; Railway/Render templates included where supported
-- **Galaxy A16:** Termux bootstrap script + native Android WebView APK + installable PWA
-- **Channels:** Telegram + Slack Socket Mode config slots, webhooks enabled
-- **EVEZ apps:** EVEZ Station, evezart-openclaw, ClawBreak, NEXUS, and VCL now link back to this gateway surface
+## Fast host install / recovery
 
-See [SURFACES.md](SURFACES.md) for the full matrix.
-
-### One-command A16 / Termux bootstrap
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/EvezArt/evez-openclaw-deploy/main/scripts/a16-termux-bootstrap.sh | bash
-~/start-openclaw.sh
-```
-
-### Health check
-
-```bash
-node scripts/surface-healthcheck.mjs http://127.0.0.1:18789
-```
-
-## Quick Start
-
-### Option 1: Docker (recommended for Galaxy A16 + PC setup)
 ```bash
 git clone https://github.com/EvezArt/evez-openclaw-deploy.git
 cd evez-openclaw-deploy
 cp .env.example .env
-# Add your API keys to .env
-docker compose up -d
-# Dashboard: http://localhost:18789
+# Fill provider/channel keys when available.
+./scripts/evez-openclaw-install-host.sh
 ```
 
-### Option 2: Local Install
+Useful commands:
+
 ```bash
-curl -fsSL https://openclaw.ai/install.sh | bash
-cp openclaw.json ~/.openclaw/openclaw.json
-cp .env.example ~/.openclaw/.env
-# Edit ~/.openclaw/.env with your keys
-openclaw gateway
+./scripts/evez-openclaw-recover.sh        # idempotent gateway recovery
+./scripts/evez-openclaw-doctor.sh         # config + WS health + channel checks
+./scripts/evez-openclaw-dashboard-link.sh # prints local/static Control UI links
+./scripts/evez-openclaw-vault-rotate.sh   # rotate gateway token and recover
+./scripts/evez-openclaw-backup-state.sh   # secret-excluding state backup
 ```
 
-### Option 3: Fly.io (cloud, always-on)
+## Docker
+
+```bash
+cp .env.example .env
+# Required for Docker/Control UI access:
+# OPENCLAW_GATEWAY_TOKEN=<strong-token>
+# Optional live channels/providers: TELEGRAM_BOT_TOKEN, GROQ_API_KEY, OPENROUTER_API_KEY, etc.
+docker compose up -d --build
+docker compose ps
+```
+
+## Fly.io
+
 ```bash
 fly launch --config fly.toml
-fly secrets set GROQ_API_KEY=... OPENROUTER_API_KEY=...
+fly volumes create openclaw_data --region iad --size 1
+fly secrets set OPENCLAW_GATEWAY_TOKEN=<strong-token> TELEGRAM_BOT_TOKEN=<telegram-token> GROQ_API_KEY=<groq-key> OPENROUTER_API_KEY=<openrouter-key>
 fly deploy
 ```
 
-## Mobile App
-See [evez-openclaw-apk](https://github.com/EvezArt/evez-openclaw-apk) for the Android app (Galaxy A16).
+The Fly image bakes in the repo config and copies it into `/data` on first boot, while keeping runtime state on the persistent volume.
 
-## What's Configured
+## Keepalive
 
-| Category | Count | Details |
-|----------|-------|---------|
-| Plugins  | 60    | All available plugins enabled |
-| Models   | 27+   | Groq, OpenRouter, GitHub Copilot, DeepSeek, etc. |
-| Channels | 2     | Telegram, Slack |
-| Fallbacks| 4     | Auto-failover: Groq → Claude → Gemini → DeepSeek → Llama-8b |
-| Thinking | High  | Extended reasoning enabled |
+Linux systemd user service:
 
-## Telegram Setup
-1. Message [@BotFather](https://t.me/BotFather) on Telegram
-2. `/newbot` → name it "EVEZ OpenClaw"
-3. Copy the bot token
-4. Add to `.env`: `TELEGRAM_BOT_TOKEN=your_token`
-5. Restart: `docker compose restart`
+```bash
+mkdir -p ~/.config/systemd/user
+cp systemd/openclaw-gateway.service systemd/openclaw-token-rotate.service systemd/openclaw-token-rotate.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now openclaw-gateway
+systemctl --user enable --now openclaw-token-rotate.timer
+```
 
-## Built by Viktor AI for EVEZ
+macOS launchd:
+
+```bash
+mkdir -p ~/Library/LaunchAgents
+cp launchd/com.evez.openclaw.gateway.plist launchd/com.evez.openclaw.rotate.plist ~/Library/LaunchAgents/
+launchctl load -w ~/Library/LaunchAgents/com.evez.openclaw.gateway.plist
+launchctl load -w ~/Library/LaunchAgents/com.evez.openclaw.rotate.plist
+```
+
+## Surface Deployments
+
+OpenClaw is packaged for EVEZ surfaces:
+
+- Desktop/server: Gateway + upstream Control UI
+- Docker: recoverable container with state volume and WS healthcheck
+- Fly.io: persistent `/data` volume config
+- Galaxy A16: Termux bootstrap + Android/WebView/PWA links
+- Channels: Telegram allowlist and Slack config slots
+- EVEZ apps: EVEZ Station, evezart-openclaw, ClawBreak, NEXUS, and VCL link back to this gateway surface
+
+See [SURFACES.md](SURFACES.md) and [ONBOARDING_RUNBOOK.md](ONBOARDING_RUNBOOK.md).
 
 ## Real OpenClaw Dashboard
 
-This deployment uses the upstream OpenClaw Gateway dashboard / Control UI. See `REAL_OPENCLAW_DASHBOARD.md` and the official OpenClaw docs:
+This deployment uses the upstream OpenClaw Gateway dashboard / Control UI. See `REAL_OPENCLAW_DASHBOARD.md` and official docs:
 
 - https://docs.openclaw.ai/web/dashboard
 - https://docs.openclaw.ai/web/control-ui
 - https://docs.openclaw.ai/cli/dashboard
 
-The Viktor Space preview now serves the upstream Control UI static build so it can connect to any real OpenClaw Gateway via `?gatewayUrl=ws://<host>:18789&token=<token>`.
+Static Control UI preview:
+
+```text
+https://preview-evez-openclaw-70c67950.viktor.space/?gatewayUrl=ws://<gateway-host>:18789&token=<gateway-token>
+```
+
+## Telegram setup
+
+Set `OPENCLAW_TELEGRAM_ALLOW_FROM` in `.env` or host env for private Telegram allowlisting when needed.
+
+For a live Telegram bot:
+
+1. Create/get bot token from BotFather.
+2. Put it in `.env` or host env as `TELEGRAM_BOT_TOKEN=...`.
+3. Run `./scripts/evez-openclaw-recover.sh`.
+4. If Telegram asks for pairing, approve with `openclaw pairing approve telegram <code>`.
+
+## AgentVault connector
+
+See [AGENTVAULT_CONNECTOR.md](AGENTVAULT_CONNECTOR.md). The connector profile is copied to OpenClaw state as a sidecar file rather than embedded in `openclaw.json` so strict OpenClaw config validation remains valid.
+
+## Built by Viktor AI for EVEZ
