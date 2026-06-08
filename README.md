@@ -2,6 +2,32 @@
 
 Pre-configured OpenClaw personal AI agent — maxed out with 60 plugins, 27+ models, Telegram/Slack channels, and model fallback chains.
 
+
+## Surface Deployments
+
+OpenClaw is now packaged for every EVEZ surface Steven asked for:
+
+- **Desktop / server:** Docker Compose gateway + OpenClaw Control dashboard
+- **Cloud:** Fly.io config with persistent volume; Railway/Render templates included where supported
+- **Galaxy A16:** Termux bootstrap script + native Android WebView APK + installable PWA
+- **Channels:** Telegram + Slack Socket Mode config slots, webhooks enabled
+- **EVEZ apps:** EVEZ Station, evezart-openclaw, ClawBreak, NEXUS, and VCL now link back to this gateway surface
+
+See [SURFACES.md](SURFACES.md) for the full matrix.
+
+### One-command A16 / Termux bootstrap
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/EvezArt/evez-openclaw-deploy/main/scripts/a16-termux-bootstrap.sh | bash
+~/start-openclaw.sh
+```
+
+### Health check
+
+```bash
+node scripts/surface-healthcheck.mjs http://127.0.0.1:18789
+```
+
 ## Quick Start
 
 ### Option 1: Docker (recommended for Galaxy A16 + PC setup)
