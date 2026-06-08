@@ -13,8 +13,10 @@ mkdir -p "$OPENCLAW_STATE_DIR" "$OPENCLAW_WORKSPACE_DIR" "$OPENCLAW_STATE_DIR/lo
 chmod 700 "$OPENCLAW_STATE_DIR"
 
 if [[ -f "$ENV_FILE" ]]; then
+  set -a
   # shellcheck disable=SC1090
   source "$ENV_FILE"
+  set +a
 fi
 : "${OPENCLAW_TELEGRAM_ALLOW_FROM:=}"
 existing_bool() {
@@ -66,8 +68,10 @@ ENV
 fi
 
 if [[ -f "$ENV_FILE" ]]; then
+  set -a
   # shellcheck disable=SC1090
   source "$ENV_FILE"
+  set +a
 fi
 
 TELEGRAM_ENABLED=false
@@ -156,8 +160,8 @@ chmod 600 "$OPENCLAW_CONFIG_PATH" "$ENV_FILE"
 AUTH_AGENT_DIR="$OPENCLAW_STATE_DIR/agents/main/agent"
 AUTH_STORE="$AUTH_AGENT_DIR/auth-profiles.json"
 mkdir -p "$AUTH_AGENT_DIR"
-if [[ ! -f "$AUTH_STORE" ]]; then
-  python3 - "$AUTH_STORE" <<'PYAUTH'
+export GROQ_API_KEY OPENROUTER_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY CEREBRAS_API_KEY DEEPSEEK_API_KEY MISTRAL_API_KEY XAI_API_KEY TOGETHER_API_KEY FIREWORKS_API_KEY NVIDIA_API_KEY DEEPINFRA_API_KEY NOVITA_API_KEY HUGGINGFACE_TOKEN
+python3 - "$AUTH_STORE" <<'PYAUTH'
 import json, os, pathlib, sys
 out=pathlib.Path(sys.argv[1])
 providers={
@@ -176,25 +180,32 @@ providers={
   "deepinfra":"DEEPINFRA_API_KEY",
   "novita":"NOVITA_API_KEY",
 }
-profiles={}
-order={}
+if out.exists():
+    try:
+        payload=json.load(out.open())
+    except Exception:
+        payload={"version":1,"profiles":{}}
+else:
+    payload={"version":1,"profiles":{}}
+payload.setdefault("version",1)
+profiles=payload.setdefault("profiles",{})
+order=payload.setdefault("order",{})
 for provider, env_name in providers.items():
     key=os.environ.get(env_name, "").strip()
     if not key:
         continue
     pid=f"{provider}:env"
-    profiles[pid]={"type":"api_key","provider":provider,"key":key}
-    order[provider]=[pid]
-payload={"version":1,"profiles":profiles}
-if order:
-    payload["order"]=order
+    existing=profiles.get(pid)
+    if not isinstance(existing, dict) or existing.get("key") != key:
+        profiles[pid]={"type":"api_key","provider":provider,"key":key}
+    order.setdefault(provider, [])
+    if pid not in order[provider]:
+        order[provider].insert(0, pid)
+if not order:
+    payload.pop("order", None)
 json.dump(payload, out.open("w"), indent=2)
 out.chmod(0o600)
 PYAUTH
-else
-  chmod 600 "$AUTH_STORE" 2>/dev/null || true
-fi
-
 
 cat > "$OPENCLAW_WORKSPACE_DIR/RECOVERY.md" <<MD
 # OpenClaw Recovery
