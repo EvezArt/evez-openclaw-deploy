@@ -14,7 +14,7 @@ chmod 700 "$OPENCLAW_STATE_DIR"
 
 # Values supplied by the caller should override stale values in openclaw.env;
 # snapshot them before sourcing the persisted env file.
-PERSIST_ENV_NAMES=(OPENCLAW_GATEWAY_TOKEN OPENCLAW_PORT OPENCLAW_BIND OPENCLAW_STATE_DIR OPENCLAW_CONFIG_PATH OPENCLAW_WORKSPACE_DIR OPENCLAW_TELEGRAM_ALLOW_FROM TELEGRAM_BOT_TOKEN SLACK_BOT_TOKEN SLACK_APP_TOKEN GROQ_API_KEY OPENROUTER_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY CEREBRAS_API_KEY DEEPSEEK_API_KEY MISTRAL_API_KEY XAI_API_KEY TOGETHER_API_KEY FIREWORKS_API_KEY NVIDIA_API_KEY DEEPINFRA_API_KEY NOVITA_API_KEY HUGGINGFACE_TOKEN GITHUB_TOKEN GH_TOKEN)
+PERSIST_ENV_NAMES=(OPENCLAW_GATEWAY_TOKEN OPENCLAW_URL OPENCLAW_TOKEN CLAWD_URL CLAWD_TOKEN CK_TOKEN EVEZ_CK_TOKEN OPENCLAW_PORT OPENCLAW_BIND OPENCLAW_STATE_DIR OPENCLAW_CONFIG_PATH OPENCLAW_WORKSPACE_DIR OPENCLAW_TELEGRAM_ALLOW_FROM TELEGRAM_BOT_TOKEN SLACK_BOT_TOKEN SLACK_APP_TOKEN GROQ_API_KEY OPENROUTER_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY CEREBRAS_API_KEY DEEPSEEK_API_KEY MISTRAL_API_KEY XAI_API_KEY TOGETHER_API_KEY FIREWORKS_API_KEY NVIDIA_API_KEY DEEPINFRA_API_KEY NOVITA_API_KEY HUGGINGFACE_TOKEN GITHUB_TOKEN GH_TOKEN)
 for name in "${PERSIST_ENV_NAMES[@]}"; do
   value="${!name:-}"
   printf -v "__EVEZ_INPUT_${name}" '%s' "$value"
@@ -132,6 +132,42 @@ if [[ -f "$ENV_FILE" ]]; then
   set +a
 fi
 
+# OpenClaw/Lobster/Clawd bridge aliases. These make generated workflows and
+# Lobster tools able to call the live gateway without the user repeating config.
+if [[ -z "${OPENCLAW_URL:-}" ]]; then
+  OPENCLAW_URL="http://127.0.0.1:${OPENCLAW_PORT}"
+  export OPENCLAW_URL
+fi
+if [[ -z "${OPENCLAW_TOKEN:-}" && -n "${OPENCLAW_GATEWAY_TOKEN:-}" ]]; then
+  OPENCLAW_TOKEN="$OPENCLAW_GATEWAY_TOKEN"
+  export OPENCLAW_TOKEN
+fi
+if [[ -z "${CLAWD_URL:-}" ]]; then
+  CLAWD_URL="$OPENCLAW_URL"
+  export CLAWD_URL
+fi
+if [[ -z "${EVEZ_CK_TOKEN:-}" && -n "${CK_TOKEN:-}" ]]; then
+  EVEZ_CK_TOKEN="$CK_TOKEN"
+  export EVEZ_CK_TOKEN
+fi
+if [[ -z "${CLAWD_TOKEN:-}" && -n "${CK_TOKEN:-}" ]]; then
+  CLAWD_TOKEN="$CK_TOKEN"
+  export CLAWD_TOKEN
+fi
+if [[ -z "${GH_TOKEN:-}" && -n "${GITHUB_TOKEN:-}" ]]; then
+  GH_TOKEN="$GITHUB_TOKEN"
+  export GH_TOKEN
+fi
+for bridge_name in OPENCLAW_URL OPENCLAW_TOKEN CLAWD_URL CLAWD_TOKEN CK_TOKEN EVEZ_CK_TOKEN GH_TOKEN; do
+  upsert_env_var "$bridge_name"
+done
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
 TELEGRAM_ENABLED=false
 if [[ -n "${TELEGRAM_BOT_TOKEN:-}" || "$EXISTING_TELEGRAM_ENABLED" == "true" ]]; then
   TELEGRAM_ENABLED=true
@@ -141,11 +177,17 @@ if [[ -n "${SLACK_BOT_TOKEN:-}" && -n "${SLACK_APP_TOKEN:-}" || "$EXISTING_SLACK
   SLACK_ENABLED=true
 fi
 
-MODEL_PRIMARY="groq/llama-3.3-70b-versatile"
-MODEL_FALLBACKS='["openrouter/meta-llama/llama-3.3-70b-instruct:free", "openrouter/openai/gpt-oss-20b:free", "openrouter/qwen/qwen3-coder:free", "groq/llama-3.1-8b-instant"]'
-if [[ -n "${OPENROUTER_API_KEY:-}" && -z "${GROQ_API_KEY:-}" ]]; then
-  MODEL_PRIMARY="openrouter/meta-llama/llama-3.3-70b-instruct:free"
-  MODEL_FALLBACKS='["openrouter/openai/gpt-oss-20b:free", "openrouter/qwen/qwen3-coder:free", "openrouter/z-ai/glm-4.5-air:free"]'
+MODEL_PRIMARY="openrouter/openai/gpt-oss-20b:free"
+MODEL_FALLBACKS='["openrouter/qwen/qwen3-coder:free", "openrouter/z-ai/glm-4.5-air:free"]'
+if [[ -n "${GEMINI_API_KEY:-}" || -n "${GOOGLE_API_KEY:-}" ]]; then
+  MODEL_PRIMARY="google/gemini-3-flash-preview"
+  MODEL_FALLBACKS='["google/gemini-3-pro-preview", "google/gemini-2.5-flash", "openrouter/google/gemini-3-flash-preview", "openrouter/google/gemini-2.5-flash", "openrouter/openai/gpt-oss-20b:free"]'
+elif [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+  MODEL_PRIMARY="openrouter/google/gemini-3-flash-preview"
+  MODEL_FALLBACKS='["openrouter/google/gemini-2.5-flash", "openrouter/openai/gpt-oss-20b:free", "openrouter/qwen/qwen3-coder:free"]'
+elif [[ -n "${GROQ_API_KEY:-}" ]]; then
+  MODEL_PRIMARY="groq/llama-3.3-70b-versatile"
+  MODEL_FALLBACKS='["groq/llama-3.1-8b-instant", "openrouter/openai/gpt-oss-20b:free"]'
 fi
 
 if [[ -d "$ROOT/workspace" ]]; then
@@ -156,6 +198,15 @@ if [[ -f "$ROOT/runtime/agentvault-connector.json" ]]; then
   chmod 600 "$OPENCLAW_STATE_DIR/agentvault-connector.json" 2>/dev/null || true
 fi
 mkdir -p "$OPENCLAW_STATE_DIR/credentials"
+OPENCLAW_TELEGRAM_ALLOW_FROM_JSON=""
+if [[ -n "${OPENCLAW_TELEGRAM_ALLOW_FROM:-}" ]]; then
+  OPENCLAW_TELEGRAM_ALLOW_FROM_JSON="$(python3 - <<'PYTGJSON'
+import json, os
+ids=[x.strip() for x in os.environ.get('OPENCLAW_TELEGRAM_ALLOW_FROM','').replace(';', ',').split(',') if x.strip()]
+print(', '.join(json.dumps(x) for x in ids))
+PYTGJSON
+)"
+fi
 if [[ -n "${OPENCLAW_TELEGRAM_ALLOW_FROM:-}" ]]; then
   python3 - "$OPENCLAW_STATE_DIR/credentials/telegram-allowFrom.json" "$OPENCLAW_TELEGRAM_ALLOW_FROM" <<'PYALLOW'
 import json,sys
@@ -187,8 +238,35 @@ cat > "$OPENCLAW_CONFIG_PATH" <<JSON
       "heartbeat": { "every": "0m" }
     }
   },
+  "commands": {
+    "restart": true,
+    "useAccessGroups": true
+  },
+  "tools": {
+    "profile": "full",
+    "alsoAllow": ["agents_list", "llm-task"],
+    "exec": {
+      "host": "gateway",
+      "security": "full",
+      "ask": "off",
+      "timeoutSec": 1800,
+      "backgroundMs": 10000,
+      "notifyOnExit": true
+    },
+    "elevated": {
+      "enabled": true,
+      "allowFrom": {
+        "telegram": [${OPENCLAW_TELEGRAM_ALLOW_FROM_JSON:-}]
+      }
+    }
+  },
   "channels": {
-    "telegram": { "enabled": $TELEGRAM_ENABLED },
+    "telegram": {
+      "enabled": $TELEGRAM_ENABLED,
+      "dmPolicy": "pairing",
+      "allowFrom": [${OPENCLAW_TELEGRAM_ALLOW_FROM_JSON:-}],
+      "commands": { "native": true, "nativeSkills": true }
+    },
     "slack": { "enabled": $SLACK_ENABLED }
   },
   "plugins": {

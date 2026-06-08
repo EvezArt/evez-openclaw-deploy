@@ -65,6 +65,9 @@
       },
       "copilot-proxy": {
         "enabled": true
+      },
+      "lobster": {
+        "enabled": true
       }
     }
   },
@@ -79,5 +82,11 @@
       "atHour": 4,
       "idleMinutes": 10080
     }
+  },
+  "tools": {
+    "alsoAllow": [
+      "agents_list",
+      "llm-task"
+    ]
   }
 }
