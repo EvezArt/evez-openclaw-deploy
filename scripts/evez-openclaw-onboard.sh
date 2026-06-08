@@ -16,7 +16,7 @@ if [[ -f "$ENV_FILE" ]]; then
   # shellcheck disable=SC1090
   source "$ENV_FILE"
 fi
-: "${OPENCLAW_TELEGRAM_ALLOW_FROM:=7453631330}"
+: "${OPENCLAW_TELEGRAM_ALLOW_FROM:=}"
 existing_bool() {
   local expr="$1" file="$2"
   [[ -f "$file" ]] || { echo false; return; }
