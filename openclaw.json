@@ -1,0 +1,15 @@
+{
+  "gateway": {
+    "mode": "local",
+    "port": 18789
+  },
+  "agents": {
+    "defaults": {
+      "model": "groq/llama-3.3-70b-versatile"
+    }
+  },
+  "meta": {
+    "lastTouchedVersion": "2026.6.1",
+    "lastTouchedAt": "2026-06-08T19:24:15.676Z"
+  }
+}
