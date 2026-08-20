@@ -1,25 +1,22 @@
 #!/usr/bin/env bash
-set -euo pipefail
-
-# EVEZ OpenClaw bootstrap for Samsung Galaxy A16 / Termux.
-# Safe defaults: installs OpenClaw, copies config, creates start scripts.
+# EVEZ OpenClaw bootstrap for a Samsung Galaxy A16 running Termux.
+# The device is a private control surface: local OpenClaw stays loopback-only and
+# the remote Contabo gateway is reached through Tailscale with a device-specific token.
+set -Eeuo pipefail
+umask 077
 
 OC_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
 OC_REPO="${OC_REPO:-https://github.com/EvezArt/evez-openclaw-deploy.git}"
 OC_WORK="$HOME/evez-openclaw-deploy"
 OC_PORT="${OPENCLAW_PORT:-18789}"
-OC_TOKEN="${OPENCLAW_AUTH_TOKEN:-evez2026}"
+ENV_FILE="$OC_HOME/.env"
 
-mkdir -p "$OC_HOME" "$OC_HOME/workspace" "$OC_HOME/logs"
+mkdir -p "$OC_HOME" "$OC_HOME/workspace" "$OC_HOME/logs" "$OC_HOME/state"
+chmod 700 "$OC_HOME"
 
 if command -v pkg >/dev/null 2>&1; then
   pkg update -y || true
-  pkg install -y git curl nodejs-lts openssl termux-services || true
-fi
-
-if ! command -v bun >/dev/null 2>&1; then
-  curl -fsSL https://bun.sh/install | bash || true
-  export PATH="$HOME/.bun/bin:$PATH"
+  pkg install -y git curl jq nodejs-lts openssl termux-api || true
 fi
 
 if [ ! -d "$OC_WORK/.git" ]; then
@@ -31,17 +28,32 @@ fi
 cp "$OC_WORK/openclaw.json" "$OC_HOME/openclaw.json"
 cp -R "$OC_WORK/workspace/." "$OC_HOME/workspace/" 2>/dev/null || true
 
-if [ ! -f "$OC_HOME/.env" ]; then
-  cp "$OC_WORK/.env.example" "$OC_HOME/.env"
+if [[ ! -f "$ENV_FILE" ]]; then
+  touch "$ENV_FILE"
 fi
+chmod 600 "$ENV_FILE"
 
-# Keep token configurable without committing secrets.
-if ! grep -q '^OPENCLAW_AUTH_TOKEN=' "$OC_HOME/.env" 2>/dev/null; then
-  printf '\nOPENCLAW_AUTH_TOKEN=%s\n' "$OC_TOKEN" >> "$OC_HOME/.env"
+upsert_env() {
+  local name="$1" value="$2"
+  grep -v "^${name}=" "$ENV_FILE" > "$ENV_FILE.tmp" 2>/dev/null || true
+  printf '%s=%s\n' "$name" "$value" >> "$ENV_FILE.tmp"
+  mv "$ENV_FILE.tmp" "$ENV_FILE"
+  chmod 600 "$ENV_FILE"
+}
+
+# Never ship or reuse a default bearer token. A device-local gateway receives its
+# own generated token, while the remote token is added only by the user or the
+# Contabo pairing procedure.
+if ! grep -q '^OPENCLAW_AUTH_TOKEN=' "$ENV_FILE"; then
+  LOCAL_TOKEN="$(openssl rand -hex 32 2>/dev/null || date +%s%N)"
+  upsert_env OPENCLAW_AUTH_TOKEN "$LOCAL_TOKEN"
 fi
+upsert_env OPENCLAW_PORT "$OC_PORT"
+upsert_env OPENCLAW_BIND "loopback"
 
-cat > "$HOME/start-openclaw.sh" <<'EOF'
+cat > "$HOME/start-openclaw.sh" <<'START'
 #!/usr/bin/env bash
+set -Eeuo pipefail
 set -a
 [ -f "$HOME/.openclaw/.env" ] && . "$HOME/.openclaw/.env"
 set +a
@@ -50,23 +62,65 @@ export OPENCLAW_STATE_DIR="$HOME/.openclaw/state"
 export OPENCLAW_CONFIG_PATH="$HOME/.openclaw/openclaw.json"
 export OPENCLAW_WORKSPACE_DIR="$HOME/.openclaw/workspace"
 mkdir -p "$OPENCLAW_STATE_DIR"
-exec npx -y openclaw@latest gateway --port "${OPENCLAW_PORT:-18789}" --bind lan --allow-unconfigured
-EOF
-chmod +x "$HOME/start-openclaw.sh"
+exec npx -y openclaw@latest gateway --port "${OPENCLAW_PORT:-18789}" --bind loopback --token "$OPENCLAW_AUTH_TOKEN"
+START
+chmod 700 "$HOME/start-openclaw.sh"
 
-cat > "$HOME/openclaw-health.sh" <<EOF
+cat > "$HOME/evez-control.sh" <<'CONTROL'
 #!/usr/bin/env bash
-curl -fsS "http://127.0.0.1:${OC_PORT}/healthz" && echo
-EOF
-chmod +x "$HOME/openclaw-health.sh"
+# Usage: evez-control.sh health | chat "message"
+set -Eeuo pipefail
+set -a
+[ -f "$HOME/.openclaw/.env" ] && . "$HOME/.openclaw/.env"
+set +a
+: "${EVEZ_REMOTE_GATEWAY:?Set the HTTPS Tailscale gateway URL in ~/.openclaw/.env}"
+: "${EVEZ_REMOTE_TOKEN:?Pair this device and store its device-specific token in ~/.openclaw/.env}"
+command -v curl >/dev/null 2>&1 || { echo 'curl is required' >&2; exit 127; }
 
-cat > "$HOME/openclaw-url.txt" <<EOF
-Local: http://127.0.0.1:${OC_PORT}
-LAN:   http://$(hostname -I 2>/dev/null | awk '{print $1}'):${OC_PORT}
-PWA:   open this URL in Chrome, then Add to Home Screen
-EOF
+case "${1:-}" in
+  health)
+    curl --fail --silent --show-error --connect-timeout 10 --max-time 20 \
+      -H "Authorization: Bearer $EVEZ_REMOTE_TOKEN" \
+      "$EVEZ_REMOTE_GATEWAY/healthz"
+    ;;
+  chat)
+    shift
+    [[ $# -gt 0 ]] || { echo 'Usage: evez-control.sh chat "message"' >&2; exit 2; }
+    body="$(jq -cn --arg message "$*" '{message:$message,stream:false}')"
+    curl --fail --silent --show-error --connect-timeout 10 --max-time 180 \
+      -H "Authorization: Bearer $EVEZ_REMOTE_TOKEN" \
+      -H 'Content-Type: application/json' \
+      --data "$body" "$EVEZ_REMOTE_GATEWAY/v1/chat" | jq .
+    ;;
+  *)
+    echo 'Usage: evez-control.sh health | chat "message"' >&2
+    exit 2
+    ;;
+esac
+CONTROL
+chmod 700 "$HOME/evez-control.sh"
 
-echo "✅ EVEZ OpenClaw A16 bootstrap installed"
-echo "Next: edit $OC_HOME/.env with fresh provider tokens, then run:"
-echo "  ~/start-openclaw.sh"
-echo "Health: ~/openclaw-health.sh"
+cat > "$HOME/evez-health.sh" <<'HEALTH'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+if "$HOME/evez-control.sh" health; then
+  command -v termux-notification >/dev/null 2>&1 && termux-notification --id 18789 --title 'EVEZ mesh' --content 'Remote gateway reachable' >/dev/null 2>&1 || true
+  echo
+else
+  command -v termux-notification >/dev/null 2>&1 && termux-notification --id 18789 --title 'EVEZ mesh' --content 'Remote gateway unavailable' >/dev/null 2>&1 || true
+  exit 1
+fi
+HEALTH
+chmod 700 "$HOME/evez-health.sh"
+
+cat > "$HOME/evez-mobile-setup.txt" <<'GUIDE'
+1. Install and sign in to the Tailscale Android app using the same private mesh as Contabo.
+2. Add EVEZ_REMOTE_GATEWAY=https://<your-private-gateway>/ and the device-specific EVEZ_REMOTE_TOKEN to ~/.openclaw/.env after the Contabo pairing flow completes.
+3. Run ~/evez-control.sh health. It must succeed before using chat.
+4. Run ~/evez-control.sh chat "status" for the remote response path.
+5. Run ~/start-openclaw.sh only when you want a separate local, loopback-only OpenClaw gateway on the phone.
+GUIDE
+
+echo 'EVEZ A16 private command surface prepared.'
+echo 'No default token, unauthenticated LAN binding, or public gateway was created.'
+echo "After Contabo pairing: ~/evez-control.sh health"
