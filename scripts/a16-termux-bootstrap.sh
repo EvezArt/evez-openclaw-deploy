@@ -68,32 +68,30 @@ chmod 700 "$HOME/start-openclaw.sh"
 
 cat > "$HOME/evez-control.sh" <<'CONTROL'
 #!/usr/bin/env bash
-# Usage: evez-control.sh health | chat "message"
+# Usage: evez-control.sh health | dashboard | chat "message"
 set -Eeuo pipefail
 set -a
 [ -f "$HOME/.openclaw/.env" ] && . "$HOME/.openclaw/.env"
 set +a
 : "${EVEZ_REMOTE_GATEWAY:?Set the HTTPS Tailscale gateway URL in ~/.openclaw/.env}"
-: "${EVEZ_REMOTE_TOKEN:?Pair this device and store its device-specific token in ~/.openclaw/.env}"
 command -v curl >/dev/null 2>&1 || { echo 'curl is required' >&2; exit 127; }
 
 case "${1:-}" in
   health)
+    # Health is intentionally unauthenticated on the private Tailscale endpoint.
+    # This proves mesh reachability even if a previously paired control token rotated.
     curl --fail --silent --show-error --connect-timeout 10 --max-time 20 \
-      -H "Authorization: Bearer $EVEZ_REMOTE_TOKEN" \
       "$EVEZ_REMOTE_GATEWAY/healthz"
     ;;
-  chat)
-    shift
-    [[ $# -gt 0 ]] || { echo 'Usage: evez-control.sh chat "message"' >&2; exit 2; }
-    body="$(jq -cn --arg message "$*" '{message:$message,stream:false}')"
-    curl --fail --silent --show-error --connect-timeout 10 --max-time 180 \
-      -H "Authorization: Bearer $EVEZ_REMOTE_TOKEN" \
-      -H 'Content-Type: application/json' \
-      --data "$body" "$EVEZ_REMOTE_GATEWAY/v1/chat" | jq .
+  dashboard|chat)
+    # OpenClaw Control uses its authenticated WebSocket protocol; the historical
+    # /v1/chat REST path is not part of this gateway. Open the real Control UI.
+    command -v termux-open-url >/dev/null 2>&1 && termux-open-url "$EVEZ_REMOTE_GATEWAY/" || true
+    echo "Open the Control UI at: $EVEZ_REMOTE_GATEWAY/"
+    echo 'Use the paired Control UI session for chat and actions.'
     ;;
   *)
-    echo 'Usage: evez-control.sh health | chat "message"' >&2
+    echo 'Usage: evez-control.sh health | dashboard | chat "message"' >&2
     exit 2
     ;;
 esac
@@ -116,8 +114,8 @@ chmod 700 "$HOME/evez-health.sh"
 cat > "$HOME/evez-mobile-setup.txt" <<'GUIDE'
 1. Install and sign in to the Tailscale Android app using the same private mesh as Contabo.
 2. Add EVEZ_REMOTE_GATEWAY=https://<your-private-gateway>/ and the device-specific EVEZ_REMOTE_TOKEN to ~/.openclaw/.env after the Contabo pairing flow completes.
-3. Run ~/evez-control.sh health. It must succeed before using chat.
-4. Run ~/evez-control.sh chat "status" for the remote response path.
+3. Run ~/evez-control.sh health. This validates the private mesh even if an old control token has rotated.
+4. Run ~/evez-control.sh dashboard (or ~/evez-control.sh chat "status") to open the authenticated OpenClaw Control UI for the remote response path.
 5. Run ~/start-openclaw.sh only when you want a separate local, loopback-only OpenClaw gateway on the phone.
 GUIDE
 
