@@ -51,6 +51,12 @@ fi
 upsert_env OPENCLAW_PORT "$OC_PORT"
 upsert_env OPENCLAW_BIND "loopback"
 
+# Default to the live private Contabo Control UI, while preserving an already
+# paired or explicitly configured device target.
+if ! grep -q '^EVEZ_REMOTE_GATEWAY=' "$ENV_FILE"; then
+  upsert_env EVEZ_REMOTE_GATEWAY "https://evezos-contabo.tail613e80.ts.net"
+fi
+
 cat > "$HOME/start-openclaw.sh" <<'START'
 #!/usr/bin/env bash
 set -Eeuo pipefail
@@ -113,10 +119,11 @@ chmod 700 "$HOME/evez-health.sh"
 
 cat > "$HOME/evez-mobile-setup.txt" <<'GUIDE'
 1. Install and sign in to the Tailscale Android app using the same private mesh as Contabo.
-2. Add EVEZ_REMOTE_GATEWAY=https://<your-private-gateway>/ and the device-specific EVEZ_REMOTE_TOKEN to ~/.openclaw/.env after the Contabo pairing flow completes.
+2. The bootstrap defaults EVEZ_REMOTE_GATEWAY to the private Contabo Control UI. Override it in ~/.openclaw/.env only when intentionally moving the command plane.
 3. Run ~/evez-control.sh health. This validates the private mesh even if an old control token has rotated.
-4. Run ~/evez-control.sh dashboard (or ~/evez-control.sh chat "status") to open the authenticated OpenClaw Control UI for the remote response path.
-5. Run ~/start-openclaw.sh only when you want a separate local, loopback-only OpenClaw gateway on the phone.
+4. Complete OpenClaw pairing and store the resulting device-specific EVEZ_REMOTE_TOKEN in ~/.openclaw/.env for interactive Control UI access.
+5. Run ~/evez-control.sh dashboard (or ~/evez-control.sh chat "status") to open the authenticated remote response path.
+6. Run ~/start-openclaw.sh only when you want a separate local, loopback-only OpenClaw gateway on the phone.
 GUIDE
 
 echo 'EVEZ A16 private command surface prepared.'
