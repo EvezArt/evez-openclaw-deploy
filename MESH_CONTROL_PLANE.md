@@ -12,6 +12,7 @@ This repository defines a **private, mobile-first command mesh** centered on the
 | Contabo health endpoint | Non-invasive reachability proof | `https://evezos-contabo.tail613e80.ts.net/healthz` | Private mesh only; intentionally unauthenticated health result |
 | Samsung Galaxy A16 | Mobile control surface | Tailscale Android client → private Control UI | Device pairing and its device-specific control token |
 | A16 local OpenClaw option | Optional loopback-only local node | `http://127.0.0.1:18789` on the phone | Device-local token; never LAN-bound |
+| Contabo Hermes Agent runtime | Separate Linux-host agent runtime; not currently verified as live | **No verified private endpoint** | Requires authenticated host inspection; must remain private and authenticated after restoration |
 | GitHub deployment repo | Declarative recovery and mobile bootstrap source | `EvezArt/evez-openclaw-deploy` | No runtime secret values committed |
 
 > The Contabo Control UI is the authoritative interactive surface. The phone uses the same private URL; it does not expose a second public control plane.
@@ -35,6 +36,14 @@ After Tailscale is connected on the phone, the command surface is deliberately s
 ```
 
 The first command validates private-mesh reachability through `/healthz`, including after a control-token rotation. The second opens the genuine authenticated Control UI, whose WebSocket protocol handles chat, pairing, and gateway operations. A historical `/v1/chat` REST shortcut is not used because the Control UI gateway does not provide it.
+
+## Hermes Agent Runtime Contract
+
+In this system, **Hermes Agent** means the separate NousResearch-style agent runtime expected on the Contabo Linux host. It is not an OpenRouter model identifier and it is not served by the OpenClaw Control UI. The conventional local surfaces are port `8642` for the gateway/API health endpoint and port `9119` for the dashboard.
+
+The latest private-mesh probes returned host-side connection refusal on both ports, and the Tailscale HTTPS front door has no Hermes-specific route. Consequently, there is **no Hermes private URL to distribute yet**. Hermes may be stopped, loopback-only, un-published from its existing container, or absent. An authenticated on-host administrative session is required to inspect and repair that state without creating a new runtime, pulling an image, deleting state, changing credentials, or weakening authentication.
+
+For an authenticated recovery session, `scripts/evez-hermes-contabo-repair.sh` is safe by default: it reads existing Hermes container/service state and listener health only. Its explicit `--apply` mode may start an already existing stopped Hermes container or `hermes*.service`, but deliberately never installs, pulls, creates, deletes, publishes, or reconfigures a resource.
 
 ## Zero-Cost Model Contract
 
@@ -67,4 +76,4 @@ The mesh follows four operating rules. First, health checks are safe and private
 
 ## Current Recovery State
 
-The private Contabo health endpoint and Control UI WebSocket are responsive. This repository contains the corrected free-model routing and the A16 private-gateway defaults. Applying the repair configuration to the running host still requires an authenticated on-host OpenClaw/administrative session; no reset, reinstallation, disk operation, or public exposure is part of that path.
+The private Contabo health endpoint and Control UI WebSocket are responsive. This repository contains the corrected free-model routing, the A16 private-gateway defaults, and a staged non-destructive Hermes runtime inspection/restart script. Hermes itself is not currently proven live: its standard private ports `8642` and `9119` refuse connections, and the host refuses tailnet SSH. Applying any existing-runtime Hermes repair therefore still requires an authenticated on-host administrative session; no reset, reinstallation, disk operation, image pull, public exposure, or authentication bypass is part of that path.
