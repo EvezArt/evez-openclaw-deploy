@@ -177,17 +177,17 @@ if [[ -n "${SLACK_BOT_TOKEN:-}" && -n "${SLACK_APP_TOKEN:-}" || "$EXISTING_SLACK
   SLACK_ENABLED=true
 fi
 
-MODEL_PRIMARY="openrouter/openai/gpt-oss-20b:free"
-MODEL_FALLBACKS='["openrouter/qwen/qwen3-coder:free", "openrouter/z-ai/glm-4.5-air:free"]'
-if [[ -n "${GEMINI_API_KEY:-}" || -n "${GOOGLE_API_KEY:-}" ]]; then
-  MODEL_PRIMARY="google/gemini-3-flash-preview"
-  MODEL_FALLBACKS='["google/gemini-3-pro-preview", "google/gemini-2.5-flash", "openrouter/google/gemini-3-flash-preview", "openrouter/google/gemini-2.5-flash", "openrouter/openai/gpt-oss-20b:free"]'
-elif [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-  MODEL_PRIMARY="openrouter/google/gemini-3-flash-preview"
-  MODEL_FALLBACKS='["openrouter/google/gemini-2.5-flash", "openrouter/openai/gpt-oss-20b:free", "openrouter/qwen/qwen3-coder:free"]'
-elif [[ -n "${GROQ_API_KEY:-}" ]]; then
+# Zero-cost routes are used by default. The list is separately checked against
+# OpenRouter's live catalog by evez-openclaw-contabo-repair.sh before deployment.
+FREE_MODEL_PRIMARY="openrouter/openrouter/free"
+FREE_MODEL_FALLBACKS='["openrouter/openai/gpt-oss-20b:free", "openrouter/google/gemma-4-31b-it:free", "openrouter/nvidia/nemotron-3-super-120b-a12b:free", "openrouter/z-ai/glm-5.2:free", "openrouter/google/gemma-4-26b-a4b-it:free"]'
+MODEL_PRIMARY="$FREE_MODEL_PRIMARY"
+MODEL_FALLBACKS="$FREE_MODEL_FALLBACKS"
+if [[ -n "${GROQ_API_KEY:-}" ]]; then
+  # Groq remains the preferred no-cost provider when the account has access;
+  # every subsequent route remains a live-verified OpenRouter free fallback.
   MODEL_PRIMARY="groq/llama-3.3-70b-versatile"
-  MODEL_FALLBACKS='["groq/llama-3.1-8b-instant", "openrouter/openai/gpt-oss-20b:free"]'
+  MODEL_FALLBACKS="$(jq -cn --argjson free "$FREE_MODEL_FALLBACKS" '["groq/llama-3.1-8b-instant"] + $free')"
 fi
 
 if [[ -d "$ROOT/workspace" ]]; then
